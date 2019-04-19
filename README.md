@@ -108,18 +108,94 @@ p obj.public_method(false)
 
 ## 上級
 ### gemのソースを読む
+gem whichコマンドで、requireしたときに読み込まれるファイルを見つけることができる。
+```sh
+$ gem which active_record
+/home/ueki/.rbenv/versions/2.6.1/lib/ruby/gems/2.6.0/gems/activerecord-5.2.2/lib/active_record.rb
+```
+
 ### gemのソースを書き換える
+上記の場所の.rbファイルをエディタで書き換えることで、gem自体に
+デバッグ出力等を入れることができる。
+作業が終わったら gem pristine <gem名>で、元の状態に戻せる。
+
 ### 現在のRubyの情報を知る
+システムに複数のRubyをインストールしている時、gem envコマンドで
+現在の環境を確認できる。
+```sh
+$ gem env
+RubyGems Environment:
+    - RUBYGEMS VERSION: 3.0.1
+    - RUBY VERSION: 2.6.1 (2019-01-30 patchlevel 33) [x86_64-linux]
+    - INSTALLATION DIRECTORY: /home/ueki/.rbenv/versions/2.6.1/lib/ruby/gems/2.6.0/
+```
 ### byebug gemでプログラムの挙動を追う
-
-
+```rb
+require 'byebug'
+...
+def foo
+    byebug
+    ...
+end
+```
+byebug起動後はirbのように使える他、以下を始めとしたたくさんのコマンドがある。
+* n(next):次の行に進む
+* s(step):nと似ているが、呼び出しているメソッドの中に入る
+* c(continue):プログラムの実行を再開する
 
 ## マスター
 ### 呼ばれている全てのメソッドを出力する（TracePoint）
+```rb
+trace = TracePoint.new(:call, :c_call){|tp|
+    cls = tp.defined_class
+    m = if cls.singleton_class?
+            "#{cls.to_s[/#<Class:(.+)>/,1]}.#{tp.method_id}"
+        else
+            "#{cls}##{tp.method_id}"
+        end
+    puts "#{m} (#{tp.path}:#{tp.lineno})"
+}
+trace.enable
+...
+trace.disable
+```
+
 ### 呼ばれている全てのメソッドを出力する（インデント付き）
+```rb
+indent = 0
+trace = TracePoint.new(:call, :return){|tp|
+    if tp.event == :return
+        print ' '*indent
+        puts "<= #[tp.defined_class, tp.method_id].inspect}"
+        indent -= 2 if indent > 0
+    else
+        print ' '*indent
+        p [tp.defined_class, tp.method_id]
+        indent += 2
+    end
+}
+trace.enable
+```
+
 ### メモリ上にあるオブジェクトの個数を数える
+```rb
+# 例：メモリ上にハッシュが何個残っているか数える。
+GC.start
+ObjectSpace.each_object(Hash).count
+# Tips: require 'objspace'すると
+# ObjectSpaceクラスのメソッドが増える。
+```
 
 ### グローバル変数が書き換えられている箇所を調べる
+```rb
+# 例：$FOOが書き換えられた箇所を調べる。
+trace_var(:$FOO) do |newval|
+    p caller.first
+end
+```
 ### rubyのバグを疑う
+CRubyのバグトラッカーを確認し、なければ再現コードを作って現象を報告する。
+
+https://bugs.ruby-lang.org/projects/ruby-trunk/issues
 
 
